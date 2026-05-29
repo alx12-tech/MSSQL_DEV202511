@@ -84,12 +84,20 @@ where ps.SupplierID not in (select distinct ppo.SupplierID from  Purchasing.Purc
 
 Таблицы: Sales.Orders, Sales.OrderLines, Sales.Customers.
 */
+/*
+Исправление ошибок: скорректировать порог цены на 100
+Логическое условие привести ко второму варианту формулировки (приоритет ИЛИ в формулировке)
+привести формат даты к заданному
+дополнить сортировкой: Сортировка должна быть по номеру квартала, трети года, дате заказа (везде по возрастанию).
 
+представить второй вариант с постраничным выводом, параметрами окна вывода
+*/
+USE WideWorldImporters
 set Language Russian;
 
 select
 	sord.OrderID,
-	sord.OrderDate,
+	Format(sord.OrderDate, 'dd.MM.yyyy') as [Дата заказа],
 	datename(month, sord.OrderDate) as 'Месяц', 
 	datepart(quarter, sord.OrderDate) as 'Квартал',
 	cast((month(sord.OrderDate) - 1)/4 as int)+1 as 'Треть',
@@ -98,10 +106,40 @@ from Sales.OrderLines sol
 left join Sales.Orders sord on sol.OrderID = sord.OrderID
 left join Sales.Customers scst on scst.CustomerID = sord.CustomerID
 where
-	(sol.UnitPrice > 1000 and sol.Quantity > 20)
-	OR sord.PickingCompletedWhen is not NULL
-	 
+	(sol.UnitPrice > 100)
+	OR 
+	(sol.Quantity > 20 and sord.PickingCompletedWhen is not NULL)
+order by
+	[Квартал],
+	[Треть],
+	[Дата заказа]
 
+
+--Вариант постраничного вывода
+declare @WindowStart int = 1000
+declare @WindowWidth int = 100
+declare @WindowNum int = 1
+--
+select
+	sord.OrderID,
+	Format(sord.OrderDate, 'dd.MM.yyyy') as [Дата заказа],
+	datename(month, sord.OrderDate) as 'Месяц', 
+	datepart(quarter, sord.OrderDate) as 'Квартал',
+	cast((month(sord.OrderDate) - 1)/4 as int)+1 as 'Треть',
+	scst.CustomerName
+from Sales.OrderLines sol 
+left join Sales.Orders sord on sol.OrderID = sord.OrderID
+left join Sales.Customers scst on scst.CustomerID = sord.CustomerID
+where
+	(sol.UnitPrice > 100)
+	OR 
+	(sol.Quantity > 20 and sord.PickingCompletedWhen is not NULL)
+order by
+	[Квартал],
+	[Треть],
+	[Дата заказа]
+offset (@WindowStart + (@WindowNum - 1) * @WindowWidth) rows
+fetch next @WindowWidth rows only
 
 /*
 4. Заказы поставщикам (Purchasing.Suppliers),
