@@ -178,6 +178,54 @@ order by 1
 В результатах должно быть ид клиета, его название, ид товара, цена, дата покупки.
 */
 drop table if exists #subreq;
+
+select distinct
+	 sc.CustomerID		as IDClient
+	,sc.CustomerName	as ClientName
+	,sil.StockItemID	as StockItemID
+	,sil.UnitPrice		as UnitPrice
+	,dense_rank() over (partition by sc.CustomerID order by sil.UnitPrice desc) as PriceRank
+	,dense_rank() over (partition by sc.CustomerID, sil.StockItemID order by si.InvoiceDate desc) as DateRank
+	,si.InvoiceDate		as InvoiceDate
+into #subreq--закоментировать для отладки
+from Sales.InvoiceLines sil
+left join Sales.Invoices si			on si.InvoiceID = sil.InvoiceID
+left join Sales.Customers sc		on sc.CustomerID = si.CustomerID
+/*--раскоментировать для отладки, проверка результата
+ORDER BY	 IDClient		asc
+			,UnitPrice		desc
+			,InvoiceDate	desc
+			,StockItemID	asc
+*/
+--в результирующую выборку по клиенту ranks in (1,1), (2,1), товар - прицепом
+
+
+select distinct
+	 sc.CustomerID			as [Идентификатор покупателя]
+	,sc.CustomerName		as [Наименование покупателя]
+	,top_price.StockItemID	as [Идентификатор товара]
+	,wsi.StockItemName		as [Наименование товара]
+	,top_price.Price		as [Макс.цена товара у покупателя]
+	,top_price.InvoiceDate	as [Посл.дата тов.по макс.цене]
+from Sales.Customers sc--исходим из приницпа - все клиенты представлены в справочнике
+CROSS APPLY (
+	SELECT
+		srq.StockItemID,
+		srq.UnitPrice as Price,
+		srq.InvoiceDate
+	from #subreq srq--здесь размечены нужные инвойсы
+	where	srq.IDClient = sc.CustomerID
+		and srq.PriceRank in (1, 2)
+		and srq.DateRank = 1
+	) top_price
+left join Warehouse.StockItems wsi	on wsi.StockItemID = top_price.StockItemID--наименование товара, чтобы не тащить через все таблицы
+ORDER BY--представление для наглядности
+	sc.CustomerID asc,
+	top_price.Price desc
+
+
+	/* OLD version
+	drop table if exists #subreq;
 select
 	 sc.CustomerID		as IDClient
 	,sc.Customername	as ClientName
@@ -216,3 +264,4 @@ ORDER BY
 	sr.IDClient asc,
 	top_price.StockItemID asc,
 	top_price.Price desc
+	*/
