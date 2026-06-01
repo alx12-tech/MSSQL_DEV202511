@@ -1,0 +1,118 @@
+@startuml
+'Диаграмма ERD MVP-проекта
+' v.1.2
+'left to right direction
+' Скрытие теней и кружков
+hide circle
+hide spot
+
+'Определение сущностей
+'Счёт, всегда на 1 клиента, второй - владелец базы
+'Номер счёта 20-значник, может быть синтетический
+Entity DIC_ACCOUNT{
+    * id_account : int <<PK>>
+--
+    * account_name : varchar(20)
+    * id_client : int
+    * accunt_description: varchar(512)
+    * id_bal2 : int <<FK>>
+    * valid_to : date
+}
+
+
+'Клиент (справочник)
+Entity DIC_CLIENT
+{
+    * id_client : INT <<PK>>
+--
+    * client_name : varchar(512)
+    * create_date : date
+    * valid: to : date
+    * is_del : BOOL
+}
+
+'Договор (справочник)
+Entity DIC_AGREEMENT
+{
+    * id_agreement : INT <<PK>>
+--
+    * agreement_name : varchar(512)
+    * create_date : date
+    * valid: to : date
+    * is_del : BOOL
+}
+
+'Проводка (основной поток данных, все поля обязательные)
+Entity FCT_CARRY
+{
+    * id_CARRY : INT <<PK>>
+  --
+    * carry_date : DATE
+'описание проводки
+    * description : varchar(512)
+    * id_account_dbt : int <<FK>>
+    * id_account_crd : int <<FK>>
+    * id_agreement : int <<FK>>
+    * VL : float
+    * transaction_way : int <<FK>>
+'дата создания проводки
+    * SRC_date : datetime
+'пользователь создавший проводку
+'    * SRC_user : int <<FK>>
+'основание для создания проводки (из справочника)'
+'    * carry_ground : int <<FK>>
+}
+
+'Остаток на дату (таблица заполняемая расчётными процедурами)
+Entity DM_REST
+{
+    * id_date : date
+    * id_account : int <<FK>>
+    * value : float
+}
+
+'Классификаторы
+'Справочник балансовых счетов, версионный
+Entity DIC_BAL2
+{
+    * id_bal2 : int <<PK>>
+    * description : varchar(512)
+    * id_bal2_parent : int
+    * valid_to : date
+    * id_del : BOOL
+    * id_bal2_version : int <<FK>>
+}
+
+'версии справочника (например разные планы счетов)
+Entity DIC_BAL2_VERSION
+{
+    * id_bal2_version : int <<PK>>
+    * version_name : varchar(1024)
+    * is_del : BOOL
+}
+
+
+'Статьи баланса (для отчётов)
+'Статьи ОПУ (для отчётов)
+'Балансовые счета (для классификаторов)
+
+'------------------Связи
+'Клиент - договор, счёт
+DIC_CLIENT ||-left-|{ DIC_ACCOUNT : владеет счётом (1:N)
+'второй стороной договора всегда рассматривается владелец базы для которого она ведётся
+DIC_CLIENT ||--|{ DIC_AGREEMENT : договор заключен с (1:N)
+
+'Проводка - счёт (движение между счетами)
+DIC_ACCOUNT ||-down-|{ FCT_CARRY : проводке нужны 2 счёта (1:2)
+DIC_BAL2 ||-|{ DIC_ACCOUNT : каждый счёт классифицирован
+
+DIC_BAL2_VERSION ||-down-|{ DIC_BAL2 : каждый счёт в каком-то справочнике
+
+DIC_AGREEMENT ||-left-|{ FCT_CARRY : договор обслуживается (1:N)
+
+'Остаток на дату - счёт (историческая таблица)
+DIC_ACCOUNT ||-up-|{ DM_REST
+
+
+
+@enduml
