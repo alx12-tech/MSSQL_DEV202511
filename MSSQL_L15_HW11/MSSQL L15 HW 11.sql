@@ -30,7 +30,7 @@ USE PersonalFinance3;
 GO
 --создание схем
 --схема для загрузки и подготовки данных
-CREATE Schema SATGE;
+CREATE Schema STAGE;
 GO
 --основная рабочая схема, хранение, расчёты
 CREATE Schema Accounting;
