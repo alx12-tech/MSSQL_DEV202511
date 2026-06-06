@@ -79,7 +79,7 @@ CREATE table Accounting.DIC_AGREEMENT (
         внешние ключи: идентификатор принадлежности к клиенту, идентификатор балансового счета
         дата валидности - срок действия (будет использоваться в расчётах - счёт должен быть валиден в расчётном периоде)
 */
-CREATE table Accounting.DIC_ACCOUNT (
+create table Accounting.DIC_ACCOUNT (
      id_account int not NULL IDENTITY(1,1) PRIMARY KEY CLUSTERED
     ,account_name varchar(20) not NULL 
     ,id_client int not NULL 
@@ -87,7 +87,8 @@ CREATE table Accounting.DIC_ACCOUNT (
     ,id_bal2 int not NULL 
     ,valid_to date not NULL default '2099-01-01'
 
-     FOREIGN KEY (id_account) REFERENCES Accounting.DIC_CLIENT(id_client)
+     FOREIGN KEY (id_client) REFERENCES Accounting.DIC_CLIENT(id_client),
+     FOREIGN KEY (id_bal2) REFERENCES Accounting.DIC_BAL2(id_bal2)
     )
 
 
@@ -107,7 +108,7 @@ CREATE table  Accounting.FCT_CARRY
      FOREIGN KEY (id_account_dbt) REFERENCES Accounting.DIC_ACCOUNT(id_account),
      FOREIGN KEY (id_account_crd) REFERENCES Accounting.DIC_ACCOUNT(id_account),
      FOREIGN KEY (id_agreement) REFERENCES Accounting.DIC_AGREEMENT(id_agreement)
-)
+);
 
 /*
     Остаток на дату (таблица заполняемая расчётными процедурами)
@@ -121,8 +122,8 @@ CREATE table  Accounting.DM_REST
     , id_account int  NOT NULL
     , val_nat   float NOT NULL
 
-    FOREIGN KEY (id_account) REFERENCES Accounting.DIC_ACCOUNT(id_account),
-)
+    FOREIGN KEY (id_account) REFERENCES Accounting.DIC_ACCOUNT(id_account)
+);
 
 --Классификаторы
 --справочник версий (пока с базовым планом счетов)
@@ -131,7 +132,7 @@ CREATE table  Accounting.DIC_BAL2_VERSION
       id_bal2_version int not NULL IDENTITY(1,1) PRIMARY KEY CLUSTERED
     , version_name varchar(1024) NOT NULL
     , is_del bit NOT NULL default 0
-)
+);
 
 
 --Справочник балансовых счетов, версионный
@@ -146,8 +147,8 @@ CREATE table  Accounting.DIC_BAL2
     ,id_del bit NOT NULL default 0
     ,id_bal2_version int NOT NULL
 
-    FOREIGN KEY (id_bal2_version) REFERENCES Accounting.DIC_BAL2_VERSION(id_bal2_version),
-)
+    FOREIGN KEY (id_bal2_version) REFERENCES Accounting.DIC_BAL2_VERSION(id_bal2_version)
+);
 
 
 
@@ -182,3 +183,31 @@ values
 ('79', 'Внутрихозяйственные расчеты',                   1, 1)
 --
 select * from Accounting.DIC_BAL2
+
+
+
+--Схема STAGE
+--на текущий момент реализована в объёме MVP
+/*
+    Наименование: буферна таблица загрузки приходно/расходных операций
+    Бизнес-ограничения: загрузка должна включать все операции за рассматриваемый период
+        иначе расчётные процедуры сгенерируют некорректный результат
+    
+    операционные свойства:
+        неиндексируемая (зачем индексировать буфер? к нему обращаются 1 раз)
+        не имеет первичного ключа (в этом нет смысла)
+        очищаемая после обработки
+        не допускает NULL (для упрощения процедур)
+        не содержит внешних ключей (иначе будет ужас при загрузке), 
+            ошибки проверяются процедурами-обработчиками при подготовке данных для передачи на расчётный слой
+*/
+
+CREATE table  STAGE.BUF_FCT_CARRY
+(
+     carry_date date           NOT NULL --дата проводки
+    ,account_name varchar(20) NOT NULL  -- наименование счёта, проверку в XLS встроить проще
+    ,agreement_name varchar(512) NOT NULL--наименование договора
+    ,carry_ground varchar(512) not null --основание для проводки (транслируется в поле description FCT_CARRY)
+    ,bal2_parent varchar(5) NOT NULL --балансовый счёт первичного учёта (в итоге должен быть привязан к ID_BAL2)
+    ,extra_data varchar(512) NOT NULL default ''--поле дополнительных признаков, может быть пустое в общем случае
+)
