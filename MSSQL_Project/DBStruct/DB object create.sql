@@ -30,7 +30,7 @@ USE PersonalFinance3;
 GO
 --создание схем
 --схема для загрузки и подготовки данных
-CREATE Schema SATGE;
+CREATE Schema STAGE;
 GO
 --основная рабочая схема, хранение, расчёты
 CREATE Schema Accounting;
@@ -87,7 +87,8 @@ CREATE table Accounting.DIC_ACCOUNT (
     ,id_bal2 int not NULL 
     ,valid_to date not NULL default '2099-01-01'
 
-     FOREIGN KEY (id_account) REFERENCES Accounting.DIC_CLIENT(id_client)
+     FOREIGN KEY (id_account) REFERENCES Accounting.DIC_CLIENT(id_client),
+     FOREIGN KEY (id_bal2) REFERENCES Accounting.DIC_BAL2(id_bal2)
     )
 
 
@@ -182,3 +183,31 @@ values
 ('79', 'Внутрихозяйственные расчеты',                   1, 1)
 --
 select * from Accounting.DIC_BAL2
+
+
+
+--Схема STAGE
+--на текущий момент реализована в объёме MVP
+/*
+    Наименование: буферна таблица загрузки приходно/расходных операций
+    Бизнес-ограничения: загрузка должна включать все операции за рассматриваемый период
+        иначе расчётные процедуры сгенерируют некорректный результат
+    
+    операционные свойства:
+        неиндексируемая (зачем индексировать буфер? к нему обращаются 1 раз)
+        не имеет первичного ключа (в этом нет смысла)
+        очищаемая после обработки
+        не допускает NULL (для упрощения процедур)
+        не содержит внешних ключей (иначе будет ужас при загрузке), 
+            ошибки проверяются процедурами-обработчиками при подготовке данных для передачи на расчётный слой
+*/
+
+CREATE table  STAGE.BUF_FCT_CARRY
+(
+     carry_date date           NOT NULL --дата проводки
+    ,account_name varchar(20) NOT NULL  -- наименование счёта, проверку в XLS встроить проще
+    ,agreement_name varchar(512) NOT NULL--наименование договора
+    ,carry_ground varchar(512) not null --основание для проводки (транслируется в поле description FCT_CARRY)
+    ,bal2_parent varchar(5) NOT NULL --балансовый счёт первичного учёта (в итоге должен быть привязан к ID_BAL2)
+    ,extra_data varchar(512) NOT NULL default ''--поле дополнительных признаков, может быть пустое в общем случае
+)
