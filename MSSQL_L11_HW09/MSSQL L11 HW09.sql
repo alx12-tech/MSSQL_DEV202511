@@ -107,17 +107,6 @@ select * from #temp_XML_VAR_table
     ?   ValidTo   
 */
 
-/* --временная копия таблицы для тестирования
-drop table if exists #temp_WareHouse_StockItems_copy;
-select * 
-into #temp_WareHouse_StockItems_copy 
-from WareHouse.StockItems
-alter table #temp_WareHouse_StockItems_copy drop column 
-    StockItemID, LastEditedBy, ValidFrom , ValidTo, MarketingComments, InternalComments, Photo, CustomFields, Tags ,
-    RecommendedRetailPrice, Barcode, Brand, Size, ColorID
---
-select * from #temp_WareHouse_StockItems_copy
-*/
 --MERGE #temp_WareHouse_StockItems_copy as TGT
 MERGE WareHouse.StockItems as TGT
 USING #temp_XML_VAR_table as SRC
