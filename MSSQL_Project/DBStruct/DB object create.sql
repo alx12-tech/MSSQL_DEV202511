@@ -13,14 +13,14 @@
 CREATE DATABASE PersonalFinance3
  ON  PRIMARY 
 	( NAME = PF_vol, FILENAME = N'C:\DBase\PFDB3\PF_vol1.mdf' , 
-		SIZE = 8MB , 
-		MAXSIZE = 50Mb, 
-		FILEGROWTH = 10MB )
+		SIZE = 100MB ,
+		MAXSIZE = 500Mb,
+		FILEGROWTH = 50MB )
  LOG ON 
 	( NAME = PF_log, FILENAME =  N'C:\DBase\PFDB3\PF_log.ldf' , 
-		SIZE = 8MB , 
-		MAXSIZE = 10GB , 
-		FILEGROWTH = 65536KB )
+		SIZE = 50MB ,
+		MAXSIZE = 1GB ,
+		FILEGROWTH = 50MB )
 GO
 
 --------------------------------------------------------------------
@@ -202,12 +202,24 @@ select * from Accounting.DIC_BAL2
             ошибки проверяются процедурами-обработчиками при подготовке данных для передачи на расчётный слой
 */
 
+--обновлённая структура буферной таблицы
 CREATE table  STAGE.BUF_FCT_CARRY
 (
+      CARRY_DATE	DATETIME2 NOT NULL
+    , TURNOVER_DBT	DOUBLE NOT NULL
+    , TURNOVER_CRD	DOUBLE NOT NULL
+    , account_name	NVARCHAR(1024) NOT NULL
+    , agreement_name	NVARCHAR(1024) NOT NULL
+    , carry_ground	NVARCHAR(1024) NOT NULL
+    , bal2            NVARCHAR(512) NOT NULL
+    , extra_Data      NVARCHAR(1024) NOT NULL
+/*
      carry_date date           NOT NULL --дата проводки
     ,account_name varchar(20) NOT NULL  -- наименование счёта, проверку в XLS встроить проще
     ,agreement_name varchar(512) NOT NULL--наименование договора
     ,carry_ground varchar(512) not null --основание для проводки (транслируется в поле description FCT_CARRY)
     ,bal2_parent varchar(5) NOT NULL --балансовый счёт первичного учёта (в итоге должен быть привязан к ID_BAL2)
     ,extra_data varchar(512) NOT NULL default ''--поле дополнительных признаков, может быть пустое в общем случае
+*/
+
 )
