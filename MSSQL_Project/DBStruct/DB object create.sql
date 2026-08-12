@@ -6,6 +6,13 @@
 		2.1 Создание первичных ключей
 		2.2 Учёт ограничений полей
 		2.3 Создание индексов
+
+	Разнесенине по файлам:
+	- создание базы
+	- создание схем, таблиц в схемах, создание индексов для таблиц
+
+	- процедуры и функции по отдельным файлам
+
 */
 
 --------------------------------------------------------------------
@@ -42,32 +49,85 @@ GO
 --------------------------------------------------------------------
 --Создание таблиц
 
+/*  Таблицы схемы STAGE
+*/
+--Схема STAGE
+--на текущий момент реализована в объёме MVP
+/*
+    Наименование: буферна таблица загрузки приходно/расходных операций
+    Бизнес-ограничения: загрузка должна включать все операции за рассматриваемый период
+        иначе расчётные процедуры сгенерируют некорректный результат
+        решено отказаться от схемы дебет-кредит для этапа MVP по причине: подобное деление оправдано при загрузке агрегированных данных (когда по счёту шло движение и по дебету и по кредиту), что в нашем случае не используется
+
+    операционные свойства:
+        неиндексируемая (буфер?)
+        не имеет первичного ключа (нет смысла)
+        очищаемая после обработки
+        не допускает NULL (для упрощения процедур)
+        не содержит внешних ключей (иначе будет ужас при загрузке),
+            ошибки проверяются процедурами-обработчиками при подготовке данных для передачи на расчётный слой
+*/
+
+DROP table IF EXISTS STAGE.BUF_FCT_CARRY;
+
+CREATE table  STAGE.BUF_FCT_CARRY
+(
+      CARRY_DATE        DATETIME2 NOT NULL--дата проводки
+    , TURNOVER_SUM      DOUBLE NOT NULL--суммарный оборот, фактически - сумма проводки
+    , account_name      NVARCHAR(1024) NOT NULL--наименование счёта (для банковских счетов - 20-начный номер)
+    , agreement_name	NVARCHAR(1024) NOT NULL--номер договора (для карт может быть наименование карты)
+    , carry_ground      NVARCHAR(1024) NOT NULL--основание платежа (первичные данные для категорирования)
+    , bal2              NVARCHAR(512) NOT NULL--балансовый счёт (для категорирования данных), полезно при отутствии внятных наименований счёта
+    , extra_data        NVARCHAR(1024) NOT NULL --дополнительные признаки вида peoperty_name=value разделитель ";" разбор отдельной процедурой
+)
+
+
+
+
+/*======================================================*/
 /*
     Назначение: хранение минимально необходимых данных по второй стороне сделки
        
 */
+DROP table IF EXISTS  Accounting.DIC_CLIENT;
 
 CREATE table Accounting.DIC_CLIENT (
-     id_client int not NULL IDENTITY(1,1) PRIMARY KEY CLUSTERED
+     id_client int not NULL IDENTITY(1,1) PRIMARY KEY CLUSTERED--идентификатор клиента
     ,client_name varchar(512) not null
-    ,create_date date not null
+    ,create_date date not null default getdate()
     ,valid_to date not null default '2099-01-01'
     ,is_del bit not null default 0
     )
 
+--создание индексов
+DROP INDEX IF EXISTS DIC_CLIENT_INDEX ON Accounting.DIC_CLIENT(ID_CLIENT);
+Create NONCLUSTERED Index DIC_CLIENT_INDEX ON Accounting.DIC_CLIENT(ID_CLIENT)
+INCLUDE CLIENT_NAME ;
+GO
+
+
+/*======================================================*/
 /*
     Назначение: хранение минимально необходимых обобщённых данных по сделке
     Примечание: в перспективе станет верхнеуровневым справочником-представлением
         детализация по сделкам разного рода будет представлена в нижележащих справочниках
         потребуется расширение на несколько колонок для обеспечения связности и идентификации направления
 */
+DROP table IF EXISTS Accounting.DIC_AGREEMENT
+
 CREATE table Accounting.DIC_AGREEMENT (
      id_agreement int not NULL IDENTITY(1,1) PRIMARY KEY CLUSTERED
     ,agreement_name varchar(512) not null
-    ,create_date date not null
+    ,create_date date not null default get_date()
     ,valid_to date not null default '2099-01-01'
     ,is_del bit not null default 0
     )
+
+--создание индексов
+DROP INDEX IF EXISTS
+Create NONCLUSTERED Index DIC_AGREEMENT_INDEX ON Accounting.DIC_AGREEMENT()
+INCLUDE AGREEMENT_NAME;
+GO
 
 
 /*  назначение: справочник счетов
@@ -79,6 +139,11 @@ CREATE table Accounting.DIC_AGREEMENT (
         внешние ключи: идентификатор принадлежности к клиенту, идентификатор балансового счета
         дата валидности - срок действия (будет использоваться в расчётах - счёт должен быть валиден в расчётном периоде)
 */
+
+
+/*======================================================*/
+DROP table IF EXISTS Accounting.DIC_ACCOUNT;
+
 CREATE table Accounting.DIC_ACCOUNT (
      id_account int not NULL IDENTITY(1,1) PRIMARY KEY CLUSTERED
     ,account_name varchar(20) not NULL 
@@ -91,8 +156,17 @@ CREATE table Accounting.DIC_ACCOUNT (
      FOREIGN KEY (id_bal2) REFERENCES Accounting.DIC_BAL2(id_bal2)
     )
 
+--создание индексов
+DROP INDEX IF EXISTS DIC_ACCOUNT_INDEX ON Accounting.DIC_ACCOUNT();
+Create NONCLUSTERED Index DIC_ACCOUNT_INDEX ON Accounting.DIC_ACCOUNT()
+INCLUDE ACCOUNT_NAME;
+GO
 
+
+/*======================================================*/
 --Проводка (основной поток данных, все поля обязательные)
+DROP table IF EXISTS Accounting.FCT_CARRY;
+
 CREATE table  Accounting.FCT_CARRY
 (
      id_CARRY int not NULL IDENTITY(1,1) PRIMARY KEY CLUSTERED
@@ -101,7 +175,7 @@ CREATE table  Accounting.FCT_CARRY
     ,id_account_dbt int         NOT NULL
     ,id_account_crd int         NOT NULL
     ,id_agreement int           NOT NULL
-    ,VL float                   NOT NULL
+    ,VL double                  NOT NULL
     ,transaction_way int        NOT NULL
     ,SRC_date datetime          NOT NULL
 
@@ -110,13 +184,24 @@ CREATE table  Accounting.FCT_CARRY
      FOREIGN KEY (id_agreement) REFERENCES Accounting.DIC_AGREEMENT(id_agreement)
 )
 
+--создание индексов
+DROP INDEX IF EXISTS FCT_CARRY_INDEX ON Accounting.FCT_CARRY(ID_CARRY);
+Create CLUSTERED Index FCT_CARRY_INDEX ON Accounting.FCT_CARRY(ID_CARRY)
+ONLINE OFF
+GO
+
+
+/*======================================================*/
+
 /*
     Остаток на дату (таблица заполняемая расчётными процедурами)
     таблица историзации результатов расчётов
         без ключа - однозначного признака здесь нет
         без индекса - индексировать там нечего - это результаты расчётов которые ежедневно дополняются
 */
-CREATE table  Accounting.DM_REST
+DROP table IF EXISTS  Accounting.DM_REST;
+
+CREATE table
 (
       id_date   date  NOT NULL
     , id_account int  NOT NULL
@@ -125,8 +210,13 @@ CREATE table  Accounting.DM_REST
     FOREIGN KEY (id_account) REFERENCES Accounting.DIC_ACCOUNT(id_account),
 )
 
+
+
+/*======================================================*/
 --Классификаторы
 --справочник версий (пока с базовым планом счетов)
+DROP table IF EXISTS Accounting.DIC_BAL2_VERSION;
+
 CREATE table  Accounting.DIC_BAL2_VERSION
 (
       id_bal2_version int not NULL IDENTITY(1,1) PRIMARY KEY CLUSTERED
@@ -135,6 +225,8 @@ CREATE table  Accounting.DIC_BAL2_VERSION
 )
 
 
+
+/*======================================================*/
 --Справочник балансовых счетов, версионный
 CREATE table  Accounting.DIC_BAL2
 (
@@ -152,7 +244,7 @@ CREATE table  Accounting.DIC_BAL2
 
 
 
-
+/*======================================================*/
 ------------------------
 --наполнение таблиц (первичное)
 
@@ -186,40 +278,4 @@ select * from Accounting.DIC_BAL2
 
 
 
---Схема STAGE
---на текущий момент реализована в объёме MVP
-/*
-    Наименование: буферна таблица загрузки приходно/расходных операций
-    Бизнес-ограничения: загрузка должна включать все операции за рассматриваемый период
-        иначе расчётные процедуры сгенерируют некорректный результат
-    
-    операционные свойства:
-        неиндексируемая (зачем индексировать буфер? к нему обращаются 1 раз)
-        не имеет первичного ключа (в этом нет смысла)
-        очищаемая после обработки
-        не допускает NULL (для упрощения процедур)
-        не содержит внешних ключей (иначе будет ужас при загрузке), 
-            ошибки проверяются процедурами-обработчиками при подготовке данных для передачи на расчётный слой
-*/
 
---обновлённая структура буферной таблицы
-CREATE table  STAGE.BUF_FCT_CARRY
-(
-      CARRY_DATE	DATETIME2 NOT NULL
-    , TURNOVER_DBT	DOUBLE NOT NULL
-    , TURNOVER_CRD	DOUBLE NOT NULL
-    , account_name	NVARCHAR(1024) NOT NULL
-    , agreement_name	NVARCHAR(1024) NOT NULL
-    , carry_ground	NVARCHAR(1024) NOT NULL
-    , bal2            NVARCHAR(512) NOT NULL
-    , extra_Data      NVARCHAR(1024) NOT NULL
-/*
-     carry_date date           NOT NULL --дата проводки
-    ,account_name varchar(20) NOT NULL  -- наименование счёта, проверку в XLS встроить проще
-    ,agreement_name varchar(512) NOT NULL--наименование договора
-    ,carry_ground varchar(512) not null --основание для проводки (транслируется в поле description FCT_CARRY)
-    ,bal2_parent varchar(5) NOT NULL --балансовый счёт первичного учёта (в итоге должен быть привязан к ID_BAL2)
-    ,extra_data varchar(512) NOT NULL default ''--поле дополнительных признаков, может быть пустое в общем случае
-*/
-
-)

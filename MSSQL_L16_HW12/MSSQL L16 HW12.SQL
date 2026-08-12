@@ -24,7 +24,7 @@
         Обновляется при расчётах, вероятно будет часто, т.к. планируется внедрение классификации по доп. признакам,
             планов и т.п., всё это будет создавать массу синтетических проводок.
         Основной поиск по ID_CARRY
-        Целесообразен индекс по ID_CARRY, но перестроение вручную (по расписанию)
+        Целесообразен индекс по ID_CARRY, но перестроение вручную (по расписанию?)
     Accounting	DM_REST
         Таблица фактов
         Наиболее частая фильтрация будет выполняться по (в порядке убывания частоты)
@@ -41,11 +41,12 @@
         Размер небольшой - индексация в н.в. не имеет смылса.
         В будущем возможно - по ID_BAL2 со включением BAL2_NAME, BAL2_VERSION (эти два поля работают только в связке)
     STAGE       BUF_FCT_CARRY
-        Таблица входящий буфер - при работе изменяется в полном объёме.
-        Индексировать бессмысленно.
+        Таблица входящий буфер - при работе изменяется в полном объёме, обрабатывается как правило однократно.
+        Индексировать незачем..
 
 */
 
+USE PersonalFinance_v4;
 --создание индексов
 DROP INDEX IF EXISTS DIC_CLIENT_INDEX ON Accounting.DIC_CLIENT(ID_CLIENT);
 Create NONCLUSTERED Index DIC_CLIENT_INDEX ON Accounting.DIC_CLIENT(ID_CLIENT)
@@ -53,17 +54,19 @@ INCLUDE CLIENT_NAME ;
 GO
 
 DROP INDEX IF EXISTS
-Create NONCLUSTERED Index DIC_AGREEMENT_INDEX ON Accounting.DIC_AGREEMENT()
+Create NONCLUSTERED Index DIC_AGREEMENT_INDEX ON Accounting.DIC_AGREEMENT(id_agreement)
 INCLUDE AGREEMENT_NAME;
 GO
 
 DROP INDEX IF EXISTS DIC_ACCOUNT_INDEX ON Accounting.DIC_ACCOUNT();
-Create NONCLUSTERED Index DIC_ACCOUNT_INDEX ON Accounting.DIC_ACCOUNT()
+Create NONCLUSTERED Index DIC_ACCOUNT_INDEX ON Accounting.DIC_ACCOUNT(id_account)
 INCLUDE ACCOUNT_NAME;
 GO
 
-DROP INDEX IF EXISTS FCT_CARRY_INDEX ON Accounting.FCT_CARRY(ID_CARRY);
-Create CLUSTERED Index FCT_CARRY_INDEX ON Accounting.FCT_CARRY(ID_CARRY)
-ONLINE OFF
-GO
+
+--индекс создан при создании таблицы
+--DROP INDEX IF EXISTS FCT_CARRY_INDEX ON Accounting.FCT_CARRY(ID_CARRY);
+--Create CLUSTERED Index FCT_CARRY_INDEX ON Accounting.FCT_CARRY(ID_CARRY)
+--with (ONLINE = OFF)
+--GO
 
