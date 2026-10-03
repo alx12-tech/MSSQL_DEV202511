@@ -26,6 +26,7 @@ AS RANGE RIGHT FOR VALUES
 );
 GO
 
+
 -- Создаем схему секционирования (для MVP все секции сажаем на файловую группу PRIMARY)
 CREATE PARTITION SCHEME ps_CarryDate_Yearly
 AS PARTITION pf_CarryDate_Yearly
